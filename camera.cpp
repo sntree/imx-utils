@@ -176,11 +176,13 @@ camera_t::camera_t
 */
 	struct v4l2_streamparm stream_parm;
 
+    stream_parm.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+
 	if (-1 == xioctl (fd_, VIDIOC_G_PARM, &stream_parm)) {
 		perror("VIDIOC_G_PARM");
 //		goto bail ;
 	}
-
+    
 	stream_parm.parm.capture.timeperframe.numerator = 1;
 	stream_parm.parm.capture.timeperframe.denominator = (fps? fps : 30);
 	if (-1 == xioctl (fd_, VIDIOC_S_PARM, &stream_parm))
@@ -432,6 +434,10 @@ int main(int argc, char const **argv) {
 			long long startCapture = end ;
 			long long maxGrab = 0, maxRelease = 0 ;
 			unsigned numFrames = 0 ;
+            char const outFileName[] = {
+                     "/sdcard/camera.out"
+					};
+			FILE *fOut = fopen(outFileName, "wb");
 			for ( int i = 0 ; !die && ((0 > params.getIterations()) || (i < params.getIterations())) ; i++ ) {
 				start = tickMs();
 				void const *data ;
@@ -443,22 +449,22 @@ int main(int argc, char const **argv) {
 					break;
 				++numFrames ;
 				long long elapsed = end-start ;
-				debugPrint( "frame %p:%d, %llu ms\n", data, index, elapsed );
+				printf( "frame %p:%d, %llu ms\n", data, index, elapsed );
 				if ( elapsed > maxGrab )
 					maxGrab = elapsed ;
-				if(numFrames == params.getSaveFrameNumber()){
-					char const outFileName[] = {
-                                                "/tmp/camera.out"
-					};
-					FILE *fOut = fopen(outFileName, "wb");
+				if(numFrames <= params.getSaveFrameNumber()){					
 					if(fOut){
-						fwrite(data,camera.imgSize(),1,fOut);
-						fclose(fOut);
-						printf( "saved frame to %s\n", outFileName);
+						fwrite(data,camera.imgSize(),1,fOut);						
 					}
 					else
 						perror(outFileName);
 				}
+                else if (fOut) {
+                    fclose(fOut);
+                    fOut = NULL;
+					printf( "saved frame to %s\n", outFileName);
+                }
+
 				start = tickMs();
 				camera.returnFrame(data,index);
 				end = tickMs();
